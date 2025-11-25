@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Project Synapse Architecture</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background-color: #f8fafc; }
+        
+        /* Canvas for SVG lines */
+        #connections {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .diagram-container {
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Node Styles */
+        .node {
+            transition: all 0.3s ease;
+            position: relative;
+            z-index: 2;
+        }
+        .node:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+
+        /* Specific Node Colors matching the previous design */
+        .node-data { background-color: #f3e5f5; border: 2px solid #7b1fa2; color: #4a148c; }
+        .node-logic { background-color: #fff3e0; border: 2px solid #ef6c00; color: #e65100; }
+        .node-ui { background-color: #e8f5e9; border: 2px solid #2e7d32; color: #1b5e20; }
+        .node-user { background-color: #e1f5fe; border: 2px solid #01579b; color: #01579b; border-radius: 50%; width: 80px; height: 80px; display: flex; align-items: center; justify-content: center; }
+        .node-secure { background-color: #ffebee; border: 2px dashed #c62828; color: #b71c1c; }
+
+        /* Animation Dot */
+        .packet {
+            width: 12px;
+            height: 12px;
+            background-color: #ef4444; /* Red for visibility */
+            border-radius: 50%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 10;
+            display: none;
+            box-shadow: 0 0 8px rgba(239, 68, 68, 0.6);
+        }
+
+        .group-label {
+            position: absolute;
+            top: -12px;
+            left: 10px;
+            background: #f8fafc;
+            padding: 0 8px;
+            font-weight: bold;
+            color: #64748b;
+            font-size: 0.85rem;
+        }
+
+        .arrow-path {
+            fill: none;
+            stroke: #94a3b8;
+            stroke-width: 2;
+            stroke-linecap: round;
+        }
+        
+        /* Active path during simulation */
+        .active-path {
+            stroke: #ef4444;
+            stroke-width: 3;
+            transition: stroke 0.3s;
+        }
+    </style>
+</head>
+<body class="p-8 min-h-screen">
+
+    <!-- Controls -->
+    <div class="fixed top-4 right-4 z-50 bg-white p-4 rounded-lg shadow-lg border border-gray-200">
+        <h3 class="font-bold text-gray-800 mb-2">Controls</h3>
+        <button onclick="runSimulation()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded shadow transition w-full">
+            ▶ Simulate Query Flow
+        </button>
+        <div id="status-text" class="mt-2 text-sm text-gray-600 italic h-6">Ready...</div>
+    </div>
+
+    <!-- SVG Layer for drawing connecting lines -->
+    <svg id="connections"></svg>
+
+    <!-- Animation Packet -->
+    <div id="packet" class="packet"></div>
+
+    <div class="max-w-6xl mx-auto diagram-container grid grid-cols-1 md:grid-cols-12 gap-8">
+        
+        <!-- Header -->
+        <div class="col-span-12 text-center mb-8">
+            <h1 class="text-3xl font-bold text-gray-800">Project Synapse Architecture</h1>
+            <p class="text-gray-500">Retrieval-Augmented Generation with Security Trimming</p>
+        </div>
+
+        <!-- 1. Data Sources (Left Col) -->
+        <div class="col-span-12 md:col-span-3 border border-gray-300 rounded-lg p-6 relative bg-white bg-opacity-50">
+            <span class="group-label">1. Data Sources</span>
+            <div class="flex flex-col gap-4">
+                <div id="node-sp" class="node node-data p-3 rounded text-center font-semibold">SharePoint</div>
+                <div id="node-int" class="node node-data p-3 rounded text-center font-semibold">Intranet</div>
+                <div id="node-pdf" class="node node-data p-3 rounded text-center font-semibold">Case Studies</div>
+            </div>
+        </div>
+
+        <!-- 2. Ingestion (Middle-Left) -->
+        <div class="col-span-12 md:col-span-3 border border-gray-300 rounded-lg p-6 relative bg-white bg-opacity-50 flex flex-col justify-center gap-8">
+            <span class="group-label">2. Ingestion Pipeline</span>
+            <div id="node-crawl" class="node node-logic p-4 rounded text-center font-bold shadow-sm">
+                Crawler &<br>Connectors
+            </div>
+            <div id="node-chunk" class="node node-logic p-4 rounded text-center font-bold shadow-sm">
+                Text Chunking<br>& Embedding
+            </div>
+        </div>
+
+        <!-- 3. Storage (Middle-Right) -->
+        <div class="col-span-12 md:col-span-3 border border-gray-300 rounded-lg p-6 relative bg-white bg-opacity-50 flex flex-col justify-center gap-6">
+            <span class="group-label">3. Secure Storage</span>
+            <div id="node-vdb" class="node node-data p-6 rounded-lg text-center font-bold shadow-md">
+                Vector<br>Database
+            </div>
+            <div id="node-acl" class="node node-secure p-3 rounded text-center text-sm font-semibold">
+                ACL / Permissions<br>Metadata
+            </div>
+            <div class="text-xs text-red-700 bg-red-50 p-2 rounded border border-red-200 mt-2">
+                ⚠ Security Trimming Check
+            </div>
+        </div>
+
+        <!-- 4. Interaction (Right Col) -->
+        <div class="col-span-12 md:col-span-3 border border-gray-300 rounded-lg p-6 relative bg-white bg-opacity-50 flex flex-col gap-6 items-center">
+            <span class="group-label">4. User Interaction</span>
+            <div id="node-user" class="node node-user shadow-md font-bold">User</div>
+            <div id="node-teams" class="node node-ui p-3 w-full rounded text-center font-bold">MS Teams Bot</div>
+            <div id="node-entra" class="node node-secure p-2 w-full rounded text-center text-sm font-semibold">Entra ID (SSO)</div>
+            <div id="node-orch" class="node node-logic p-4 w-full rounded text-center font-bold shadow-sm ring-2 ring-orange-200">
+                Orchestrator<br><span class="text-xs font-normal text-gray-600">(RAG Core / MCP)</span>
+            </div>
+            <div id="node-llm" class="node node-logic p-3 w-full rounded text-center font-bold bg-gradient-to-r from-orange-100 to-yellow-100">LLM (AI)</div>
+        </div>
+
+    </div>
+
+    <!-- Explanation Box -->
+    <div class="max-w-4xl mx-auto mt-12 p-6 bg-white rounded-lg shadow border border-gray-200">
+        <h3 class="font-bold text-lg mb-2">How it works</h3>
+        <ul class="list-disc pl-5 space-y-2 text-gray-700">
+            <li><strong>Ingestion (Left):</strong> The system continuously crawls documents, chunks them into text, and tags them with security ACLs before storing them in the Vector DB.</li>
+            <li><strong>Query (Right):</strong> When a user asks a question, the Orchestrator checks Entra ID for their permissions.</li>
+            <li><strong>Security (Center):</strong> The DB <em>only</em> returns chunks the user is allowed to see.</li>
+            <li><strong>Generation:</strong> The LLM creates an answer using only those safe chunks.</li>
+        </ul>
+    </div>
+
+<script>
+    // Logic to draw SVG lines between nodes
+    const svg = document.getElementById('connections');
+    
+    // Define connections: [StartID, EndID, Direction(optional)]
+    const connections = [
+        ['node-sp', 'node-crawl'],
+        ['node-int', 'node-crawl'],
+        ['node-pdf', 'node-crawl'],
+        ['node-crawl', 'node-chunk'],
+        ['node-chunk', 'node-vdb'],
+        ['node-chunk', 'node-acl'],
+        ['node-user', 'node-teams'],
+        ['node-teams', 'node-entra'],
+        ['node-teams', 'node-orch'],
+        ['node-orch', 'node-vdb'],
+        ['node-orch', 'node-llm']
+    ];
+
+    function drawLines() {
+        svg.innerHTML = ''; // Clear existing lines
+        // Define arrow marker
+        svg.innerHTML += `
+            <defs>
+                <marker id="arrowhead" markerWidth="10" markerHeight="7" 
+                refX="9" refY="3.5" orient="auto">
+                    <polygon points="0 0, 10 3.5, 0 7" fill="#94a3b8" />
+                </marker>
+                 <marker id="arrowhead-active" markerWidth="10" markerHeight="7" 
+                refX="9" refY="3.5" orient="auto">
+                    <polygon points="0 0, 10 3.5, 0 7" fill="#ef4444" />
+                </marker>
+            </defs>
+        `;
+
+        connections.forEach(([startId, endId]) => {
+            const start = document.getElementById(startId);
+            const end = document.getElementById(endId);
+            
+            if(!start || !end) return;
+
+            const startRect = start.getBoundingClientRect();
+            const endRect = end.getBoundingClientRect();
+            
+            // Calculate coordinates relative to the page/scroll
+            const scrollX = window.scrollX;
+            const scrollY = window.scrollY;
+
+            // Simple logic to find closest edges
+            const x1 = startRect.left + startRect.width / 2 + scrollX;
+            const y1 = startRect.top + startRect.height / 2 + scrollY;
+            const x2 = endRect.left + endRect.width / 2 + scrollX;
+            const y2 = endRect.top + endRect.height / 2 + scrollY;
+
+            const path = document.createElementNS("http://www.w3.org/2000/svg", "line");
+            path.setAttribute("x1", x1);
+            path.setAttribute("y1", y1);
+            path.setAttribute("x2", x2);
+            path.setAttribute("y2", y2);
+            path.setAttribute("class", "arrow-path");
+            path.setAttribute("id", `line-${startId}-${endId}`);
+            path.setAttribute("marker-end", "url(#arrowhead)");
+            
+            svg.appendChild(path);
+        });
+    }
+
+    // Animation Logic
+    async function runSimulation() {
+        const status = document.getElementById('status-text');
+        const packet = document.getElementById('packet');
+        const path = ['node-user', 'node-teams', 'node-entra', 'node-orch', 'node-vdb', 'node-orch', 'node-llm', 'node-orch', 'node-teams', 'node-user'];
+        const messages = [
+            "User asks question...",
+            "Bot receives message...",
+            "Verifying Permissions...",
+            "Processing Query...",
+            "Applying Security Filters...",
+            "Chunks Retrieved...",
+            "Generating Answer...",
+            "Formatting Response...",
+            "Sending to Teams...",
+            "Answer Received!"
+        ];
+
+        packet.style.display = 'block';
+
+        for (let i = 0; i < path.length - 1; i++) {
+            const startId = path[i];
+            const endId = path[i+1];
+            status.textContent = messages[i];
+            
+            // Highlight line if exists
+            let line = document.getElementById(`line-${startId}-${endId}`);
+            if(!line) line = document.getElementById(`line-${endId}-${startId}`); // try reverse
+            
+            if(line) {
+                line.style.stroke = "#ef4444";
+                line.setAttribute("marker-end", "url(#arrowhead-active)");
+            }
+
+            // Move packet
+            const startEl = document.getElementById(startId);
+            const endEl = document.getElementById(endId);
+            const startRect = startEl.getBoundingClientRect();
+            const endRect = endEl.getBoundingClientRect();
+
+            const startX = startRect.left + startRect.width / 2 + window.scrollX;
+            const startY = startRect.top + startRect.height / 2 + window.scrollY;
+            const endX = endRect.left + endRect.width / 2 + window.scrollX;
+            const endY = endRect.top + endRect.height / 2 + window.scrollY;
+
+            // Animate using Web Animations API
+            const animation = packet.animate([
+                { top: `${startY - 6}px`, left: `${startX - 6}px` },
+                { top: `${endY - 6}px`, left: `${endX - 6}px` }
+            ], {
+                duration: 800,
+                fill: 'forwards',
+                easing: 'ease-in-out'
+            });
+
+            await animation.finished;
+
+            // Reset line style
+            if(line) {
+                line.style.stroke = "#94a3b8";
+                line.setAttribute("marker-end", "url(#arrowhead)");
+            }
+        }
+        
+        status.textContent = "Complete.";
+        setTimeout(() => { packet.style.display = 'none'; }, 500);
+    }
+
+    // Redraw on resize
+    window.addEventListener('resize', drawLines);
+    // Draw on load
+    window.onload = drawLines;
+    // Redraw after a slight delay to ensure fonts loaded
+    setTimeout(drawLines, 100);
+
+</script>
+</body>
+</html>
